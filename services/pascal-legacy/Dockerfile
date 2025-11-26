@@ -1,11 +1,23 @@
 FROM debian:12-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends     fp-compiler postgresql-client ca-certificates     && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        fpc \
+        fp-units-fcl \
+        postgresql-client-15 \
+        ca-certificates \
+        bash \
+        coreutils; \
+    rm -rf /var/lib/apt/lists/*
 
-WORKDIR /opt/legacy
-COPY legacy.pas ./
-COPY run.sh /usr/local/bin/run_legacy.sh
-RUN sed -i 's/\r$//' /usr/local/bin/run_legacy.sh
-RUN chmod +x /usr/local/bin/run_legacy.sh
+WORKDIR /app
 
-CMD ["/usr/local/bin/run_legacy.sh"]
+COPY legacy.pas .
+
+RUN fpc -Mobjfpc -Scghi -O2 legacy.pas -olegacy
+
+ENV CSV_OUT_DIR=/data/csv
+VOLUME ["/data/csv"]
+
+CMD ["./legacy"]

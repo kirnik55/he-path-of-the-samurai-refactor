@@ -14,6 +14,7 @@ class AstroController extends Controller
 
         $from = now('UTC')->toDateString();
         $to   = now('UTC')->addDays($days)->toDateString();
+        $time = now('UTC')->format('H:i:s');
 
         $appId  = env('ASTRO_APP_ID', '');
         $secret = env('ASTRO_APP_SECRET', '');
@@ -22,32 +23,49 @@ class AstroController extends Controller
         }
 
         $auth = base64_encode($appId . ':' . $secret);
-        $url  = 'https://api.astronomyapi.com/api/v2/bodies/events?' . http_build_query([
-            'latitude'  => $lat,
-            'longitude' => $lon,
-            'from'      => $from,
-            'to'        => $to,
-        ]);
 
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER     => [
-                'Authorization: Basic ' . $auth,
-                'Content-Type: application/json',
-                'User-Agent: monolith-iss/1.0'
-            ],
-            CURLOPT_TIMEOUT        => 25,
-        ]);
-        $raw  = curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_RESPONSE_CODE) ?: 0;
-        $err  = curl_error($ch);
-        curl_close($ch);
+        // запросим события по солнцу и луне
+        $bodies  = ['sun', 'moon'];
+        $results = [];
 
-        if ($raw === false || $code >= 400) {
-            return response()->json(['error' => $err ?: ("HTTP " . $code), 'code' => $code, 'raw' => $raw], 403);
+        foreach ($bodies as $body) {
+            $url = 'https://api.astronomyapi.com/api/v2/bodies/events/' . $body . '?' . http_build_query([
+                'latitude'   => $lat,
+                'longitude'  => $lon,
+                'elevation'  => 0,
+                'from_date'  => $from,
+                'to_date'    => $to,
+                'time'       => $time,
+                'output'     => 'table',
+            ]);
+
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER     => [
+                    'Authorization: Basic ' . $auth,
+                    'Content-Type: application/json',
+                    'User-Agent: monolith-iss/1.0',
+                ],
+                CURLOPT_TIMEOUT        => 25,
+            ]);
+            $raw  = curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_RESPONSE_CODE) ?: 0;
+            $err  = curl_error($ch);
+            curl_close($ch);
+
+            if ($raw === false || $code >= 400) {
+                $results[$body] = [
+                    'error' => $err ?: ("HTTP " . $code),
+                    'code'  => $code,
+                    'raw'   => $raw,
+                ];
+            } else {
+                $json = json_decode($raw, true);
+                $results[$body] = $json ?? ['raw' => $raw];
+            }
         }
-        $json = json_decode($raw, true);
-        return response()->json($json ?? ['raw' => $raw]);
+
+        return response()->json($results);
     }
 }
