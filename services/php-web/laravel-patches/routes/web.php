@@ -1,20 +1,33 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\OsdrController;
+use App\Http\Controllers\ProxyController;
+use App\Http\Controllers\AstroController;
+use App\Http\Controllers\CmsController;
+use App\Http\Controllers\IssController;
 
-Route::get('/', fn() => redirect('/dashboard'));
+// Главная → обзорный дашборд
+Route::get('/', fn () => redirect('/dashboard'));
 
-// Панели
-Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index']);
-Route::get('/osdr',      [\App\Http\Controllers\OsdrController::class,      'index']);
+// Обзор
+Route::get('/dashboard', [DashboardController::class, 'index']);
+
+// Отдельные бизнес-страницы
+Route::get('/iss',  [IssController::class,  'index']);                   // ISS / орбита
+Route::get('/osdr', [OsdrController::class, 'index']);                   // OSDR датасеты
+Route::get('/jwst', [DashboardController::class, 'jwst']);               // JWST галерея
+Route::get('/astro', [AstroController::class, 'page']);                  // AstronomyAPI
+Route::get('/cms/dashboard-experiment', [CmsController::class, 'dashboardExperiment']); // CMS демо
 
 // Прокси к rust_iss
-Route::get('/api/iss/last',  [\App\Http\Controllers\ProxyController::class, 'last']);
-Route::get('/api/iss/trend', [\App\Http\Controllers\ProxyController::class, 'trend']);
+Route::get('/api/iss/last',  [ProxyController::class, 'last']);
+Route::get('/api/iss/trend', [ProxyController::class, 'trend']);
 
-// JWST галерея (JSON)
-Route::get('/api/jwst/feed', [\App\Http\Controllers\DashboardController::class, 'jwstFeed']);
-Route::get("/api/astro/events", [\App\Http\Controllers\AstroController::class, "events"]);
-use App\Http\Controllers\AstroController;
-Route::get('/page/{slug}', [\App\Http\Controllers\CmsController::class, 'page']);
-Route::get('/page/{slug}', [\App\Http\Controllers\CmsController::class, 'page']);
+// Внешние API (JWST, AstronomyAPI)
+Route::get('/api/jwst/feed',    [DashboardController::class, 'jwstFeed']);
+Route::get('/api/astro/events', [AstroController::class,    'events']);
+
+// CMS-страницы по slug
+Route::get('/page/{slug}', [CmsController::class, 'page']);

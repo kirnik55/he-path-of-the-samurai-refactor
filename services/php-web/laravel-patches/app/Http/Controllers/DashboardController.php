@@ -15,6 +15,13 @@ class DashboardController extends Controller
         return $raw ? (json_decode($raw, true) ?: []) : [];
     }
 
+    public function jwst()
+    {
+    return view('jwst');
+    }
+
+
+
     public function index()
     {
         // минимум: карта МКС и пустые контейнеры, JWST-галерея подтянется через /api/jwst/feed

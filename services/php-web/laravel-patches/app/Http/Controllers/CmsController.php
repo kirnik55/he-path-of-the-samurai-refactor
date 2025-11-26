@@ -8,4 +8,10 @@ class CmsController extends Controller {
     if (!$row) abort(404);
     return response()->view('cms.page', ['title' => $row->title, 'html' => $row->content]);
   }
+
+  public function dashboardExperiment()
+  {
+    return view('cms_dashboard');
+  }
+
 }
