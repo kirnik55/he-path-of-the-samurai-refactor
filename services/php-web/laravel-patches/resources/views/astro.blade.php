@@ -64,7 +64,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const sortColSel = document.getElementById('astroSortColumn');
   const sortDirSel = document.getElementById('astroSortDir');
 
-  // Хранилище всех найденных событий
   let astroRows = [];
 
   function normalize(node){
@@ -86,6 +85,44 @@ document.addEventListener('DOMContentLoaded', () => {
       Object.values(x).forEach(dfs);
     })(root);
     return rows;
+  }
+
+  function fallbackFromAstronomyApi(root){
+    const out = [];
+
+    function addBody(key, node){
+      if (!node || typeof node !== 'object') return;
+      const data = node.data || {};
+      const dates = data.dates || {};
+      const from  = dates.from || '';
+      const to    = dates.to   || '';
+      const observer = data.observer || {};
+      const loc   = observer.location || {};
+      const lat   = loc.latitude;
+      const lon   = loc.longitude;
+
+      const when = (from || to) ? `${from || '?'} → ${to || '?'}` : '';
+      let extra  = '';
+      if (lat != null && lon != null) {
+        extra = `lat ${lat}, lon ${lon}`;
+      }
+
+      out.push({
+        name: key,                    
+        type: 'период наблюдения',    
+        when,
+        extra,
+      });
+    }
+
+    Object.entries(root || {}).forEach(([key, val]) => {
+      if (!val || typeof val !== 'object') return;
+      if (val.data && (val.data.dates || val.data.observer)) {
+        addBody(key, val);
+      }
+    });
+
+    return out;
   }
 
   function renderTable(rows){
@@ -114,8 +151,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const mul = dir === 'desc' ? -1 : 1;
 
     if (col === 'when') {
-      const da = parseMaybeDate(a.when);
-      const db = parseMaybeDate(b.when);
+      const partA = (a.when || '').split('→')[0].trim();
+      const partB = (b.when || '').split('→')[0].trim();
+      const da = parseMaybeDate(partA);
+      const db = parseMaybeDate(partB);
       if (da && db) {
         if (da < db) return -1 * mul;
         if (da > db) return  1 * mul;
@@ -150,7 +189,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const js = await r.json();
       raw.textContent = JSON.stringify(js, null, 2);
 
-      astroRows = collect(js);
+      const primary  = collect(js);                 
+      const fallback = primary.length ? [] : fallbackFromAstronomyApi(js);
+
+      astroRows = primary.length ? primary : fallback;
       applySortAndRender();
     }catch(e){
       console.error(e);
@@ -164,13 +206,15 @@ document.addEventListener('DOMContentLoaded', () => {
     load(q);
   });
 
-  // реагируем на смену сортировки
   sortColSel.addEventListener('change', applySortAndRender);
   sortDirSel.addEventListener('change', applySortAndRender);
 
-  // автозагрузка
+  // автозагрузка при открытии страницы
   load({lat: form.lat.value, lon: form.lon.value, days: form.days.value});
 });
 </script>
 @endsection
+
+
+
 

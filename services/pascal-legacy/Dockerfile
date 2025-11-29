@@ -8,8 +8,11 @@ RUN set -eux; \
         postgresql-client-15 \
         ca-certificates \
         bash \
-        coreutils; \
-    rm -rf /var/lib/apt/lists/*
+        coreutils \
+        libreoffice-core \
+        libreoffice-calc; \
+    apt-get clean; \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 WORKDIR /app
 
@@ -17,6 +20,7 @@ COPY legacy.pas .
 
 RUN fpc -Mobjfpc -Scghi -O2 legacy.pas -olegacy
 
+# Каталог для CSV/XLSX
 ENV CSV_OUT_DIR=/data/csv
 VOLUME ["/data/csv"]
 

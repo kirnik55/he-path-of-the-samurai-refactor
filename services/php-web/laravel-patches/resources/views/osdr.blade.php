@@ -4,10 +4,17 @@
 <div class="container py-3">
   <h3 class="mb-3">NASA OSDR</h3>
 
+  {{-- Источник + панель поиска/сортировки (как на Astro) --}}
   <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-2">
     <div class="small text-muted">Источник {{ $src }}</div>
 
-    <form id="osdrSortForm" class="row row-cols-auto g-2 align-items-center">
+    <form id="osdrFilterForm" class="row row-cols-auto g-2 align-items-center">
+      <div class="col">
+        <input type="text"
+               class="form-control form-control-sm"
+               id="osdrSearch"
+               placeholder="Ключевые слова (id, title, URL)">
+      </div>
       <div class="col">
         <select class="form-select form-select-sm" id="osdrSortColumn">
           <option value="none">Без сортировки</option>
@@ -55,6 +62,7 @@
               <a href="{{ $row['rest_url'] }}" target="_blank" rel="noopener">открыть</a>
             @else — @endif
           </td>
+          {{-- updated_at с fallback на inserted_at --}}
           <td>{{ $row['updated_at'] ?? $row['inserted_at'] ?? '—' }}</td>
           <td>{{ $row['inserted_at'] ?? '—' }}</td>
           <td>
@@ -78,12 +86,17 @@
 document.addEventListener('DOMContentLoaded', () => {
   const table   = document.getElementById('osdrTable');
   const tbody   = table.querySelector('tbody');
-  const sortForm = document.getElementById('osdrSortForm');
-  const sortCol  = document.getElementById('osdrSortColumn');
-  const sortDir  = document.getElementById('osdrSortDir');
+  const form    = document.getElementById('osdrFilterForm');
+  const search  = document.getElementById('osdrSearch');
+  const sortCol = document.getElementById('osdrSortColumn');
+  const sortDir = document.getElementById('osdrSortDir');
 
-  const originalRows = Array.from(tbody.querySelectorAll('tr'));
+  const EMPTY_ROW_HTML = '<tr><td colspan="7" class="text-center text-muted">нет данных</td></tr>';
 
+  // Сохраняем исходные строки (как снимок, без "перетасовки")
+  const originalRows = Array.from(tbody.querySelectorAll('tr')).map(tr => tr.cloneNode(true));
+
+  // Индексы колонок в <tr>
   const COL_INDEX = {
     dataset_id: 1,
     title: 2,
@@ -97,59 +110,83 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function parseValue(val, key) {
+    // Датовые поля сортируем как Date
     if (key === 'updated_at' || key === 'inserted_at') {
       if (!val || val === '—') return null;
       const d = new Date(val);
       return isNaN(d.getTime()) ? null : d;
     }
+    // Остальное — строка
     return (val || '').toLowerCase();
   }
 
-  function applySort() {
-    const key = sortCol.value;
-    const dir = sortDir.value === 'desc' ? 'desc' : 'asc';
-    const mul = dir === 'desc' ? -1 : 1;
+  function applyFilterAndSort() {
+    const term = (search.value || '').toLowerCase().trim();
+    const key  = sortCol.value;
+    const dir  = sortDir.value === 'desc' ? 'desc' : 'asc';
+    const mul  = dir === 'desc' ? -1 : 1;
 
-    if (key === 'none' || !COL_INDEX[key]) {
-      tbody.innerHTML = '';
-      originalRows.forEach(tr => tbody.appendChild(tr));
-      return;
-    }
-
-    const colIndex = COL_INDEX[key];
-
-    const rows = originalRows.slice().filter(tr => {
+    // Берём только "настоящие" строки с данными
+    let rows = originalRows.filter(tr => {
       const tds = tr.querySelectorAll('td');
       if (!tds.length) return false;
-      const firstCell = tds[0].textContent.trim();
-      if (firstCell === 'нет данных') return false;
-      return true;
+      const first = tds[0].textContent.trim();
+      return first !== 'нет данных';
     });
 
-    rows.sort((a, b) => {
-      const va = parseValue(getCellText(a, colIndex), key);
-      const vb = parseValue(getCellText(b, colIndex), key);
+    // Фильтрация по ключевым словам (dataset_id + title + REST_URL)
+    if (term) {
+      rows = rows.filter(tr => {
+        const dataset = getCellText(tr, COL_INDEX.dataset_id).toLowerCase();
+        const title   = getCellText(tr, COL_INDEX.title).toLowerCase();
+        const url     = getCellText(tr, 3).toLowerCase(); // REST_URL — 3-я колонка
+        const haystack = dataset + ' ' + title + ' ' + url;
+        return haystack.includes(term);
+      });
+    }
 
-      if (va === null && vb === null) return 0;
-      if (va === null) return 1;
-      if (vb === null) return -1;
+    // Сортировка (если выбрано поле)
+    if (key !== 'none' && COL_INDEX[key] != null) {
+      const colIndex = COL_INDEX[key];
 
-      if (va < vb) return -1 * mul;
-      if (va > vb) return  1 * mul;
-      return 0;
-    });
+      rows.sort((a, b) => {
+        const va = parseValue(getCellText(a, colIndex), key);
+        const vb = parseValue(getCellText(b, colIndex), key);
 
+        if (va === null && vb === null) return 0;
+        if (va === null) return 1;
+        if (vb === null) return -1;
+
+        if (va < vb) return -1 * mul;
+        if (va > vb) return  1 * mul;
+        return 0;
+      });
+    }
+
+    // Перерисовываем tbody
     tbody.innerHTML = '';
-    rows.forEach(tr => tbody.appendChild(tr));
+    if (!rows.length) {
+      tbody.insertAdjacentHTML('beforeend', EMPTY_ROW_HTML);
+    } else {
+      rows.forEach(tr => tbody.appendChild(tr));
+    }
   }
 
-  sortForm.addEventListener('submit', (e) => {
+  // Обработка формы (кнопка "Применить")
+  form.addEventListener('submit', (e) => {
     e.preventDefault();
-    applySort();
+    applyFilterAndSort();
   });
 
-  sortCol.addEventListener('change', applySort);
-  sortDir.addEventListener('change', applySort);
+  // Живой поиск по мере ввода
+  search.addEventListener('input', applyFilterAndSort);
+
+  // Автопересортировка при смене селектов
+  sortCol.addEventListener('change', applyFilterAndSort);
+  sortDir.addEventListener('change', applyFilterAndSort);
+
+  // Стартовый рендер (без фильтра и сортировки)
+  applyFilterAndSort();
 });
 </script>
 @endsection
