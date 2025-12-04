@@ -2,32 +2,51 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\IssController;
 use App\Http\Controllers\OsdrController;
-use App\Http\Controllers\ProxyController;
 use App\Http\Controllers\AstroController;
 use App\Http\Controllers\CmsController;
-use App\Http\Controllers\IssController;
+use App\Http\Controllers\ProxyController;
 
-// Главная → обзорный дашборд
-Route::get('/', fn () => redirect('/dashboard'));
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+| Здесь только обычные веб-страницы и простые API-эндпоинты.
+| Без всяких middleware, чтобы сейчас всё стабильно заработало.
+|
+*/
 
-// Обзор
-Route::get('/dashboard', [DashboardController::class, 'index']);
+// Главная панель
+Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
-// Отдельные бизнес-страницы
-Route::get('/iss',  [IssController::class,  'index']);                   // ISS / орбита
-Route::get('/osdr', [OsdrController::class, 'index']);                   // OSDR датасеты
-Route::get('/jwst', [DashboardController::class, 'jwst']);               // JWST галерея
-Route::get('/astro', [AstroController::class, 'page']);                  // AstronomyAPI
-Route::get('/cms/dashboard-experiment', [CmsController::class, 'dashboardExperiment']); // CMS демо
+// ISS — отдельная страница
+Route::get('/iss', [IssController::class, 'index'])->name('iss');
 
-// Прокси к rust_iss
-Route::get('/api/iss/last',  [ProxyController::class, 'last']);
-Route::get('/api/iss/trend', [ProxyController::class, 'trend']);
+// OSDR — отдельная страница
+Route::get('/osdr', [OsdrController::class, 'index'])->name('osdr');
 
-// Внешние API (JWST, AstronomyAPI)
-Route::get('/api/jwst/feed',    [DashboardController::class, 'jwstFeed']);
-Route::get('/api/astro/events', [AstroController::class,    'events']);
+// JWST — отдельная страница
+Route::get('/jwst', [DashboardController::class, 'jwstPage'])->name('jwst');
 
-// CMS-страницы по slug
-Route::get('/page/{slug}', [CmsController::class, 'page']);
+// Astro — отдельная страница
+Route::get('/astro', [AstroController::class, 'page'])->name('astro');
+
+// CMS-демо
+Route::get('/cms/welcome', [CmsController::class, 'welcome']);
+Route::get('/cms/unsafe', [CmsController::class, 'unsafe']);
+Route::get('/cms/dashboard-experiment', [CmsController::class, 'dashboardExperiment']);
+
+// ==== API ====
+
+// ISS API
+Route::prefix('api/iss')->group(function () {
+    Route::get('last',  [ProxyController::class, 'last']);
+    Route::get('trend', [ProxyController::class, 'trend']);
+});
+
+// JWST API
+Route::get('api/jwst/feed', [DashboardController::class, 'jwstFeed']);
+
+// Astronomy API
+Route::get('api/astro/events', [AstroController::class, 'events']);

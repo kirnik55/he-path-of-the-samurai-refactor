@@ -2,20 +2,23 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Http\Requests\AstroEventsRequest;
+
 
 class AstroController extends Controller
 {
     public function page()
     {
-    return view('astro');
+        return view('astro');
     }
-    
-    public function events(Request $r)
+
+    public function events(AstroEventsRequest $request)
     {
-        $lat  = (float) $r->query('lat', 55.7558);
-        $lon  = (float) $r->query('lon', 37.6176);
-        $days = max(1, min(30, (int) $r->query('days', 7)));
+        $data = $request->validated();
+
+        $lat  = (float) $data['lat'];
+        $lon  = (float) $data['lon'];
+        $days = (int)   $data['days'];
 
         $from = now('UTC')->toDateString();
         $to   = now('UTC')->addDays($days)->toDateString();
@@ -29,7 +32,6 @@ class AstroController extends Controller
 
         $auth = base64_encode($appId . ':' . $secret);
 
-        // запросим события по солнцу и луне
         $bodies  = ['sun', 'moon'];
         $results = [];
 
